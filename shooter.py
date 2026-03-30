@@ -1,16 +1,15 @@
 from pygame import *
 from random import randint
+from time import time as timer
 font.init()
-font2 = font.SysFont('Arial', 24)
+font2 = font.SysFont('Arial bold', 24)
 font1 = font.SysFont('Arial bold', 70)
 
 mixer.init()
 mixer.music.load('space.ogg')
-mixer.music.play()
-mixer.music.set_volume(0.1)
+#mixer.music.play()
+mixer.music.set_volume(0.2)
 fire_sound = mixer.Sound('fire.ogg')
-fire_sound.set_volume(0.1)
-
 
 clock = time.Clock()
 window = display.set_mode((700,500))
@@ -38,114 +37,126 @@ class Player(GameSprite):
             self.rect.x += self.speed
    
     def fire(self):
-       bullet = Bullet('bullet.png', self.rect.centerx, self.rect.top, 15, 20, -15)
-       bullets.add(bullet)
+        bullet = Bullet('bullet.png', self.rect.centerx, self.rect.top, 15, 20, 15)
+        bullets.add(bullet)
 
 
-class Ememy(GameSprite):
+class Enemy(GameSprite):
     def update(self):
         global lost
         self.rect.y += self.speed
         if self.rect.y >= 500:
             self.rect.x = randint(50, 650)  
-            self.rect.y = 0      
-            lost += 1
+            self.rect.y = -50  
+            lost += 1  
 
-class Bullet(GameSprite):
+class Bullet(GameSprite):  
     def update(self):
-       self.rect.y += self.speed      
-       if self.rect.y < 0:    #исчезает, если дойдет до края экрана
-           self.kill()
+        self.rect.y -= self.speed
+        if self.rect.y < 0:
+            self.kill()
 
-
-
-ship = Player('rocket.png',5, 400, 80, 100, 10)
+ship = Player('rocket.png',5, 400, 80, 100, 5)
 enemies = sprite.Group()
-for i in range(5):
-    enemy = Ememy('ufo.png', randint(50, 650), 0, 80, 50, randint(1, 4))
+for i in range(6):
+    enemy = Enemy('ufo.png', randint(0, 620), -50, 80, 50, randint(1, 5))
     enemies.add(enemy)
+asteroids = sprite.Group()
+asteroid = Enemy('asteroid.png', randint(0, 620), -50, 80, 80, randint(5,7))
+asteroids.add(asteroid)
+stars = sprite.Group()
+star = Enemy('star.png', randint(0, 620), -50, 80, 80, randint(5, 9))
+stars.add(star)
 bullets = sprite.Group()
 game = True
 finish = False
+rel_time = False
+num_fire =0
 lost = 0
 score = 0
-
-win = font1.render('YOU WIN!', True, (255, 255, 255))
+life = 5
+win = font1.render('YOU WIN!', True, (0, 180, 0))
 lose = font1.render('YOU LOSE!', True, (180, 0, 0))
+
 while game:
     time.delay(50)
     for e in event.get():
         if e.type == QUIT:
            game = False
-        elif e.type == KEYDOWN:
-           if e.key == K_SPACE:
-               fire_sound.play()
-               ship.fire()
-               fire_sound.play()
-
+        if e.type == KEYDOWN:
+            if e.key == K_SPACE:
+                if num_fire < 5 and rel_time == False:
+                       num_fire += 1
+                       fire_sound.play()
+                       ship.fire()
+                     
+                if num_fire  >= 5 and rel_time == False:
+                    last_time = timer()
+                    rel_time = True
          
     if not finish:
         window.blit(back,(0,0))
         ship.reset()
-        ship.update()  
+        ship.update()
         enemies.draw(window)
         enemies.update()
-	   bullets.draw(window)
-        bullets.update()
-
-        collides = sprite.groupcollide(enemies, bullets, True, True)
-        for c in collides:
-           score = += 1
-           enemy = Enemy('ufo.png', randint(50, 650), 0, 80, 50, randint(1, 4))
-           enemies.add(enemy)
-
-
         text_lose = font2.render("Пропущено: " + str(lost), True, (255, 255, 255))
         window.blit(text_lose,(10,50))
         text_score = font2.render("Счёт: " + str(score), True, (255, 255, 255))
         window.blit(text_score,(10,20))
+        text_life = font1.render(str(life), True, (0, 255, 0))
+        window.blit(text_life,(650,10))
+        bullets.draw(window)
+        bullets.update()
+        asteroids.draw(window)
+        asteroids.update()
+        stars.draw(window)
+        stars.update()
+        if rel_time == True:
+           new_time = timer()
+       
+           if new_time - last_time < 3:
+               reload = font1.render('Wait, reload...', True, (150, 0, 0))
+               window.blit(reload, (260, 460))
+           else:
+               num_fire = 0  
+               rel_time = False
 
-        
 
-       #возможный проигрыш: пропустили слишком много или герой столкнулся с врагом
-        if sprite.spritecollide(ship, enemies, False) or lost > 3:
-            finish = True #проиграли, ставим фон и больше не управляем спрайтами.
+        if sprite.spritecollide(ship, enemies, True):
+            life -= 1
+            enemy = Enemy('ufo.png', randint(0, 620), -50, 80, 50, randint(1, 5))
+            enemies.add(enemy)
+        if sprite.spritecollide(ship, asteroids, True):
+            life -= 2
+            asteroid = Enemy('asteroid.png', randint(0, 620), -50, 80, 80, randint(5,7))
+            asteroids.add(asteroid)
+        if sprite.spritecollide(ship, stars, True):
+            life += 1
+            star = Enemy('star.png', randint(0, 620), -50, 80, 80, randint(5, 9))
+            stars.add(star)
+
+        text_life = font1.render(str(life), True, (0, 255, 0))
+        window.blit(text_life,(650,10))
+       
+        if life == 0 or lost >= 10:
             window.blit(lose, (200, 200))
-
-
-        #проверка выигрыша: сколько очков набрали?
-        if score > 10:
             finish = True
+       
+        collides = sprite.groupcollide(enemies, bullets, True, True)
+        for collide in collides:
+            score += 1
+            text_score = font2.render("Счёт: " + str(score), True, (255, 255, 255))
+            window.blit(text_score,(10,20))
+            enemy = Enemy('ufo.png', randint(0, 620), -50, 80, 50, randint(1, 7))
+            enemies.add(enemy)
+        if score >= 10:
+            window.blit(text_score,(10,20))
             window.blit(win, (200, 200))
-
-
-       #пишем текст на экране
-        text = font2.render("Счет: " + str(score), 1, (255, 255, 255))
-        window.blit(text_score, (10, 20))
-
-
-        text_lose = font2.render("Пропущено: " + str(lost), 1, (255, 255, 255))
-        window.blit(text_lose, (10, 50))
-
+            finish = True
 
         display.update()
-   #бонус: автоматический перезапуск игры
-    else:
-        finish = False
-        score = 0
-        lost = 0
-        for b in bullets:
-            b.kill()
-        for e in enemies:
-            e.kill()
-
-
-        time.delay(3000)
-        for i in range(1, 6):
-            enemy = Enemy('ufo.png', randint(50, 650), 0, 80, 50, randint(1, 4))
-            enemies.add(enemy)
-   
-
-
     time.delay(50)
+
+
 
